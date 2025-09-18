@@ -82,6 +82,8 @@ const UserProfileDropdown = ({ user, onLogout }) => {
           e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.2)";
         }}
       >
+        <div style={avatarStyle}>
+        </div>
         <span style={{ marginRight: "8px", fontWeight: "600", fontSize: "14px" }}>
           {user?.username || "User"}
         </span>
@@ -90,6 +92,21 @@ const UserProfileDropdown = ({ user, onLogout }) => {
 
       {isOpen && (
         <div style={dropdownMenuStyle}>
+          <a
+            href="/edit_profile"
+            style={dropdownItemStyle}
+            onClick={() => setIsOpen(false)}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+              e.target.style.color = "#8b5cf6";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = "transparent";
+              e.target.style.color = "#4b5563";
+            }}
+          >
+            Profile
+          </a>
           <button
             style={dropdownItemStyle}
             onClick={handleLogout}
@@ -250,6 +267,23 @@ const MobileMenu = ({ isOpen, user, onLogout, discover, onClose }) => {
               }}
             >
               Your Chats
+            </a>
+            <a
+              href="/edit_profile"
+              style={mobileLinkStyle}
+              onClick={onClose}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+                e.target.style.color = "#8b5cf6";
+                e.target.style.borderColor = "rgba(139, 92, 246, 0.2)";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+                e.target.style.color = "#374151";
+                e.target.style.borderColor = "rgba(229, 231, 235, 0.3)";
+              }}
+            >
+              Edit Profile
             </a>
 
             {discover && (
@@ -530,6 +564,22 @@ const Header = () => {
                   }}
                 >
                   Your Chats
+                </a>
+                <a
+                  href="/edit_profile"
+                  style={navLinkStyle}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+                    e.target.style.color = "#8b5cf6";
+                    e.target.style.borderColor = "rgba(139, 92, 246, 0.2)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+                    e.target.style.color = "#4b5563";
+                    e.target.style.borderColor = "rgba(229, 231, 235, 0.3)";
+                  }}
+                >
+                  Edit Profile
                 </a>
                 <UserProfileDropdown user={user} onLogout={handleLogout} />
               </>
