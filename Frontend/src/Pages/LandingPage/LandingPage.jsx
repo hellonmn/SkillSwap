@@ -6,7 +6,7 @@ const LandingPage = () => {
   const [inputValue, setInputValue] = useState("");
   const [isInputFocused, setIsInputFocused] = useState(false);
   
-  
+  // Search-related state
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
@@ -18,8 +18,8 @@ const LandingPage = () => {
     limit: 10
   });
 
-  
-  const API_BASE_URL = `${import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_LOCALHOST || 'http:
+  // Base API URL - using your environment variables
+  const API_BASE_URL = `${import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_LOCALHOST || 'http://localhost:8000'}/user`;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -33,12 +33,12 @@ const LandingPage = () => {
     };
   }, []);
 
-  
+  // Fetch trending skills on component mount
   useEffect(() => {
     fetchTrendingSkills();
   }, []);
 
-  
+  // Fetch trending skills
   const fetchTrendingSkills = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/trending-skills?limit=14`);
@@ -48,7 +48,7 @@ const LandingPage = () => {
       }
     } catch (error) {
       console.error('Error fetching trending skills:', error);
-      
+      // Fallback to default skills
       setTrendingSkills([
         "JavaScript", "Photography", "Guitar", "Cooking", "UI/UX Design", 
         "React", "Python", "Video Editing", "Digital Marketing", "Yoga",
@@ -57,7 +57,7 @@ const LandingPage = () => {
     }
   };
 
-  
+  // Debounced search function
   const debounce = (func, delay) => {
     let timeoutId;
     return (...args) => {
@@ -66,7 +66,7 @@ const LandingPage = () => {
     };
   };
 
-  
+  // Search users
   const searchUsers = async (query, category = 'all', sortBy = 'relevance') => {
     if (!query || query.trim().length < 2) {
       setSearchResults([]);
@@ -98,7 +98,7 @@ const LandingPage = () => {
     }
   };
 
-  
+  // Get skill suggestions
   const getSkillSuggestions = async (input) => {
     if (!input || input.trim().length < 1) {
       setSkillSuggestions([]);
@@ -118,28 +118,28 @@ const LandingPage = () => {
     }
   };
 
-  
+  // Debounced versions
   const debouncedSearch = useCallback(debounce(searchUsers, 500), [searchFilters]);
   const debouncedSuggestions = useCallback(debounce(getSkillSuggestions, 300), []);
 
-  
+  // Handle input change
   const handleInputChange = (e) => {
     const value = e.target.value;
     setInputValue(value);
     
-    
+    // Trigger search and suggestions
     debouncedSearch(value, searchFilters.category, searchFilters.sortBy);
     debouncedSuggestions(value);
   };
 
-  
+  // Handle search button click
   const handleSearch = () => {
     if (inputValue.trim()) {
       searchUsers(inputValue, searchFilters.category, searchFilters.sortBy);
     }
   };
 
-  
+  // Enhanced event handlers (keeping existing ones)
   const handleButtonHover = (e) => {
     e.target.style.transform = "translate(-3px, -3px)";
     e.target.style.boxShadow = "9px 9px 0px #000";
@@ -191,7 +191,7 @@ const LandingPage = () => {
     setTimeout(() => setActiveSkill(null), 2000);
   };
 
-  
+  // Styles (keeping existing ones and adding new ones)
   const containerStyle = {
     minHeight: "100vh",
     background: "linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%)",
@@ -276,7 +276,7 @@ const LandingPage = () => {
     letterSpacing: "1px",
   };
 
-  
+  // Search-specific styles
   const searchResultsStyle = {
     position: "absolute",
     top: "100%",
@@ -491,7 +491,7 @@ const LandingPage = () => {
     fontWeight: "500",
   };
 
-  
+  // Enhanced star decorations
   const StarDecoration = ({ style }) => (
     <div
       style={{
@@ -511,7 +511,7 @@ const LandingPage = () => {
     </div>
   );
 
-  
+  // Floating shapes
   const FloatingShape = ({ style, children }) => (
     <div
       style={{
@@ -1004,7 +1004,7 @@ const LandingPage = () => {
       </section>
 
       <style>{`
-        @import url('https:
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         
         * {
           font-family: 'Inter', sans-serif;
@@ -1039,7 +1039,7 @@ const LandingPage = () => {
           }
         }
 
-       
+        /* Custom scrollbar for search results */
         ::-webkit-scrollbar {
           width: 8px;
         }
@@ -1058,7 +1058,7 @@ const LandingPage = () => {
           background: #7c3aed;
         }
 
-       
+        /* Loading animation */
         @keyframes pulse {
           0%, 100% {
             opacity: 1;
@@ -1072,7 +1072,7 @@ const LandingPage = () => {
           animation: pulse 2s ease-in-out infinite;
         }
 
-       
+        /* Hover effects for interactive elements */
         .search-result-item:hover {
           background-color: #f8fafc !important;
           transform: translateX(5px);
@@ -1082,7 +1082,7 @@ const LandingPage = () => {
           background-color: #e0e0e0 !important;
         }
 
-       
+        /* Focus styles for accessibility */
         input:focus {
           outline: 3px solid rgba(139, 92, 246, 0.3);
           outline-offset: 2px;
@@ -1093,7 +1093,7 @@ const LandingPage = () => {
           outline-offset: 2px;
         }
 
-       
+        /* Responsive design improvements */
         @media (max-width: 1024px) {
           .features-grid {
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
@@ -1151,7 +1151,7 @@ const LandingPage = () => {
           }
         }
 
-       
+        /* Animation for search results appearance */
         @keyframes slideDown {
           from {
             opacity: 0;
@@ -1167,7 +1167,7 @@ const LandingPage = () => {
           animation: slideDown 0.3s ease-out;
         }
 
-       
+        /* Skill button active state animation */
         @keyframes skillPulse {
           0% {
             transform: scale(1);
@@ -1184,7 +1184,7 @@ const LandingPage = () => {
           animation: skillPulse 0.6s ease-in-out;
         }
 
-       
+        /* Enhanced button states */
         .cta-button:active {
           transform: translate(3px, 3px) !important;
           box-shadow: 3px 3px 0px #000 !important;
@@ -1194,7 +1194,7 @@ const LandingPage = () => {
           transform: translate(1px, 1px) !important;
         }
 
-       
+        /* Gradient text animation */
         @keyframes gradientShift {
           0% {
             background-position: 0% 50%;
@@ -1216,7 +1216,7 @@ const LandingPage = () => {
           background-clip: text;
         }
 
-       
+        /* Enhanced shadow effects */
         .neo-shadow {
           box-shadow: 
             6px 6px 0px #000,
@@ -1229,7 +1229,7 @@ const LandingPage = () => {
             9px 9px 0px 2px rgba(139, 92, 246, 0.1);
         }
 
-       
+        /* Search result item animation */
         .search-result-item {
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -1239,7 +1239,7 @@ const LandingPage = () => {
           box-shadow: -4px 0px 0px rgba(139, 92, 246, 0.2);
         }
 
-       
+        /* Loading dots animation */
         @keyframes loadingDots {
           0%, 20% {
             color: rgba(139, 92, 246, 0.4);
@@ -1260,7 +1260,7 @@ const LandingPage = () => {
           animation: loadingDots 1.4s infinite ease-in-out;
         }
 
-       
+        /* Accessibility improvements */
         @media (prefers-reduced-motion: reduce) {
           *,
           *::before,
@@ -1271,7 +1271,7 @@ const LandingPage = () => {
           }
         }
 
-       
+        /* High contrast mode support */
         @media (prefers-contrast: high) {
           .search-input,
           .cta-button,
@@ -1285,7 +1285,7 @@ const LandingPage = () => {
           }
         }
 
-       
+        /* Focus indicators for keyboard navigation */
         .search-result-item:focus,
         .suggestion-item:focus {
           outline: 3px solid #8b5cf6;
@@ -1293,7 +1293,7 @@ const LandingPage = () => {
           background-color: #f8fafc;
         }
 
-       
+        /* Print styles */
         @media print {
           .search-results,
           .filters-container,
