@@ -17,6 +17,11 @@ const messageSchema = new Schema(
       trim: true,
       required: true,
     },
+    type: {
+      type: String,
+      enum: ["text", "callRequest"],
+      default: "text",
+    },
   },
   { timestamps: true }
 );

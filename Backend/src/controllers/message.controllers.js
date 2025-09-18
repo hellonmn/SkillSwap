@@ -73,3 +73,51 @@ export const getMessages = asyncHandler(async (req, res) => {
 
   return res.status(200).json(new ApiResponse(200, messages, "Messages fetched successfully"));
 });
+
+export const sendCallRequestMessage = asyncHandler(async (req, res) => {
+  console.log("\n******** Inside sendCallRequestMessage Controller function ********");
+
+  const { chatId, date, time, note } = req.body;
+
+  if (!chatId || !date || !time) {
+    throw new ApiError(400, "Please provide chatId, date and time");
+  }
+
+  const sender = req.user._id;
+
+  const chat = await Chat.findById(chatId);
+  if (!chat) {
+    throw new ApiError(404, "Chat not found");
+  }
+
+  if (!chat.users.includes(sender)) {
+    throw new ApiError(400, "Chat is not approved");
+  }
+
+  const content = `${req.user.name} requested a video call on ${date} at ${time}${note ? ` - ${note}` : ""}`;
+
+  let message = await Message.create({
+    chatId: chatId,
+    sender: sender,
+    content: content,
+    type: "callRequest",
+  });
+
+  message = await message.populate("sender", "username name email picture");
+  message = await message.populate("chatId");
+  message = await User.populate(message, {
+    path: "chatId.users",
+    select: "username name email picture",
+  });
+
+  await Chat.findByIdAndUpdate(
+    { _id: chatId },
+    {
+      latestMessage: message,
+    }
+  );
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, message, "Call request message sent successfully"));
+});

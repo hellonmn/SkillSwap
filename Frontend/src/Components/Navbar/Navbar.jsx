@@ -4,7 +4,6 @@ const UserProfileDropdown = ({ user, onLogout }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = async () => {
-    // Perform logout logic
     try {
       const response = await fetch("/auth/logout");
       onLogout();
@@ -19,15 +18,15 @@ const UserProfileDropdown = ({ user, onLogout }) => {
     display: "flex",
     alignItems: "center",
     cursor: "pointer",
-    backgroundColor: "white",
-    border: "3px solid #000",
-    borderRadius: "12px",
-    padding: "8px 15px",
-    boxShadow: "4px 4px 0px #000",
-    transition: "all 0.1s ease",
-    transform: "translate(0, 0)",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    backdropFilter: "blur(10px)",
+    border: "1px solid rgba(139, 92, 246, 0.2)",
+    borderRadius: "8px",
+    padding: "8px 12px",
+    boxShadow: "0 2px 8px rgba(139, 92, 246, 0.15)",
+    transition: "all 0.2s ease",
     textDecoration: "none",
-    color: "#2d2d2d",
+    color: "#374151",
   };
 
   const avatarStyle = {
@@ -35,18 +34,19 @@ const UserProfileDropdown = ({ user, onLogout }) => {
     height: "32px",
     borderRadius: "50%",
     overflow: "hidden",
-    marginRight: "10px",
-    border: "2px solid #000",
+    marginRight: "8px",
+    border: "2px solid rgba(139, 92, 246, 0.2)",
   };
 
   const dropdownMenuStyle = {
     position: "absolute",
     top: "100%",
     right: "0",
-    backgroundColor: "white",
-    border: "3px solid #000",
-    borderRadius: "12px",
-    boxShadow: "6px 6px 0px #000",
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    backdropFilter: "blur(10px)",
+    border: "1px solid rgba(229, 231, 235, 0.3)",
+    borderRadius: "8px",
+    boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
     minWidth: "150px",
     zIndex: 1000,
     marginTop: "8px",
@@ -56,46 +56,16 @@ const UserProfileDropdown = ({ user, onLogout }) => {
   const dropdownItemStyle = {
     display: "block",
     width: "100%",
-    padding: "12px 20px",
+    padding: "12px 16px",
     backgroundColor: "transparent",
     border: "none",
     textAlign: "left",
     cursor: "pointer",
-    fontSize: "1rem",
+    fontSize: "14px",
     fontWeight: "500",
-    color: "#2d2d2d",
-    transition: "all 0.1s ease",
+    color: "#4b5563",
+    transition: "all 0.2s ease",
     textDecoration: "none",
-  };
-
-  const handleToggleHover = (e) => {
-    e.currentTarget.style.transform = "translate(-2px, -2px)";
-    e.currentTarget.style.boxShadow = "6px 6px 0px #000";
-  };
-
-  const handleToggleLeave = (e) => {
-    e.currentTarget.style.transform = "translate(0, 0)";
-    e.currentTarget.style.boxShadow = "4px 4px 0px #000";
-  };
-
-  const handleToggleMouseDown = (e) => {
-    e.currentTarget.style.transform = "translate(2px, 2px)";
-    e.currentTarget.style.boxShadow = "2px 2px 0px #000";
-  };
-
-  const handleToggleMouseUp = (e) => {
-    e.currentTarget.style.transform = "translate(-2px, -2px)";
-    e.currentTarget.style.boxShadow = "6px 6px 0px #000";
-  };
-
-  const handleItemHover = (e) => {
-    e.target.style.backgroundColor = "#8b5cf6";
-    e.target.style.color = "white";
-  };
-
-  const handleItemLeave = (e) => {
-    e.target.style.backgroundColor = "transparent";
-    e.target.style.color = "#2d2d2d";
   };
 
   return (
@@ -103,40 +73,34 @@ const UserProfileDropdown = ({ user, onLogout }) => {
       <div
         style={toggleStyle}
         onClick={() => setIsOpen(!isOpen)}
-        onMouseEnter={handleToggleHover}
-        onMouseLeave={handleToggleLeave}
-        onMouseDown={handleToggleMouseDown}
-        onMouseUp={handleToggleMouseUp}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = "rgba(139, 92, 246, 0.05)";
+          e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.3)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.9)";
+          e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.2)";
+        }}
       >
-        <div style={avatarStyle}>
-          <img
-            src={user?.picture || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=32&h=32&fit=crop&crop=face"}
-            alt="User Avatar"
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        </div>
-        <span style={{ marginRight: "8px", fontWeight: "600" }}>
+        <span style={{ marginRight: "8px", fontWeight: "600", fontSize: "14px" }}>
           {user?.username || "User"}
         </span>
-        <span style={{ fontSize: "0.8rem" }}>▼</span>
+        <span style={{ fontSize: "12px", color: "#6b7280" }}>▼</span>
       </div>
 
       {isOpen && (
         <div style={dropdownMenuStyle}>
-          <a
-            href="#profile"
-            style={dropdownItemStyle}
-            onClick={() => setIsOpen(false)}
-            onMouseEnter={handleItemHover}
-            onMouseLeave={handleItemLeave}
-          >
-            Profile
-          </a>
           <button
             style={dropdownItemStyle}
             onClick={handleLogout}
-            onMouseEnter={handleItemHover}
-            onMouseLeave={handleItemLeave}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = "rgba(239, 68, 68, 0.1)";
+              e.target.style.color = "#ef4444";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = "transparent";
+              e.target.style.color = "#4b5563";
+            }}
           >
             Logout
           </button>
@@ -166,10 +130,11 @@ const MobileMenu = ({ isOpen, user, onLogout, discover, onClose }) => {
     right: 0,
     height: "100vh",
     width: "300px",
-    background: "linear-gradient(135deg, #e6e6fa 0%, #d8bfd8 50%, #dda0dd 100%)",
-    border: "3px solid #000",
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    backdropFilter: "blur(10px)",
+    border: "1px solid rgba(229, 231, 235, 0.3)",
     borderRight: "none",
-    boxShadow: "-8px 0px 0px #000",
+    boxShadow: "-4px 0px 20px rgba(0, 0, 0, 0.1)",
     padding: "80px 30px 30px",
     transform: isOpen ? "translateX(0)" : "translateX(100%)",
     transition: "transform 0.3s ease",
@@ -181,49 +146,36 @@ const MobileMenu = ({ isOpen, user, onLogout, discover, onClose }) => {
     position: "absolute",
     top: "20px",
     right: "20px",
-    background: "white",
-    border: "3px solid #000",
+    background: "rgba(255, 255, 255, 0.9)",
+    border: "1px solid rgba(229, 231, 235, 0.3)",
     borderRadius: "50%",
     width: "40px",
     height: "40px",
     cursor: "pointer",
-    fontSize: "1.2rem",
-    fontWeight: "bold",
+    fontSize: "20px",
+    fontWeight: "500",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    boxShadow: "4px 4px 0px #000",
-    transition: "all 0.1s ease",
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+    transition: "all 0.2s ease",
+    color: "#6b7280",
   };
 
   const mobileLinkStyle = {
     display: "block",
-    color: "#2d2d2d",
+    color: "#374151",
     textDecoration: "none",
-    fontSize: "1.1rem",
+    fontSize: "16px",
     fontWeight: "600",
-    padding: "15px 20px",
-    margin: "10px 0",
-    backgroundColor: "white",
-    border: "3px solid #000",
-    borderRadius: "12px",
-    boxShadow: "4px 4px 0px #000",
-    transition: "all 0.1s ease",
-    textAlign: "center",
-  };
-
-  const handleLinkHover = (e) => {
-    e.target.style.transform = "translate(-2px, -2px)";
-    e.target.style.boxShadow = "6px 6px 0px #000";
-    e.target.style.backgroundColor = "#8b5cf6";
-    e.target.style.color = "white";
-  };
-
-  const handleLinkLeave = (e) => {
-    e.target.style.transform = "translate(0, 0)";
-    e.target.style.boxShadow = "4px 4px 0px #000";
-    e.target.style.backgroundColor = "white";
-    e.target.style.color = "#2d2d2d";
+    padding: "12px 16px",
+    margin: "8px 0",
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    border: "1px solid rgba(229, 231, 235, 0.3)",
+    borderRadius: "8px",
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+    transition: "all 0.2s ease",
+    textAlign: "left",
   };
 
   return (
@@ -234,12 +186,12 @@ const MobileMenu = ({ isOpen, user, onLogout, discover, onClose }) => {
           style={closeButtonStyle}
           onClick={onClose}
           onMouseEnter={(e) => {
-            e.target.style.transform = "translate(-1px, -1px)";
-            e.target.style.boxShadow = "5px 5px 0px #000";
+            e.target.style.backgroundColor = "rgba(239, 68, 68, 0.1)";
+            e.target.style.color = "#ef4444";
           }}
           onMouseLeave={(e) => {
-            e.target.style.transform = "translate(0, 0)";
-            e.target.style.boxShadow = "4px 4px 0px #000";
+            e.target.style.backgroundColor = "rgba(255, 255, 255, 0.9)";
+            e.target.style.color = "#6b7280";
           }}
         >
           ×
@@ -249,8 +201,16 @@ const MobileMenu = ({ isOpen, user, onLogout, discover, onClose }) => {
           href="/"
           style={mobileLinkStyle}
           onClick={onClose}
-          onMouseEnter={handleLinkHover}
-          onMouseLeave={handleLinkLeave}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+            e.target.style.color = "#8b5cf6";
+            e.target.style.borderColor = "rgba(139, 92, 246, 0.2)";
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+            e.target.style.color = "#374151";
+            e.target.style.borderColor = "rgba(229, 231, 235, 0.3)";
+          }}
         >
           Home
         </a>
@@ -261,8 +221,16 @@ const MobileMenu = ({ isOpen, user, onLogout, discover, onClose }) => {
               href="/discover"
               style={mobileLinkStyle}
               onClick={onClose}
-              onMouseEnter={handleLinkHover}
-              onMouseLeave={handleLinkLeave}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+                e.target.style.color = "#8b5cf6";
+                e.target.style.borderColor = "rgba(139, 92, 246, 0.2)";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+                e.target.style.color = "#374151";
+                e.target.style.borderColor = "rgba(229, 231, 235, 0.3)";
+              }}
             >
               Discover
             </a>
@@ -270,15 +238,29 @@ const MobileMenu = ({ isOpen, user, onLogout, discover, onClose }) => {
               href="/chats"
               style={mobileLinkStyle}
               onClick={onClose}
-              onMouseEnter={handleLinkHover}
-              onMouseLeave={handleLinkLeave}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+                e.target.style.color = "#8b5cf6";
+                e.target.style.borderColor = "rgba(139, 92, 246, 0.2)";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+                e.target.style.color = "#374151";
+                e.target.style.borderColor = "rgba(229, 231, 235, 0.3)";
+              }}
             >
               Your Chats
             </a>
 
             {discover && (
               <div style={{ marginTop: "20px" }}>
-                <h3 style={{ color: "#2d2d2d", marginBottom: "15px", textAlign: "center" }}>
+                <h3 style={{ 
+                  color: "#374151", 
+                  marginBottom: "15px", 
+                  textAlign: "left",
+                  fontSize: "16px",
+                  fontWeight: "600"
+                }}>
                   Discover Sections
                 </h3>
                 {["For You", "Popular", "Web Development", "Machine Learning", "Others"].map((section) => (
@@ -287,16 +269,20 @@ const MobileMenu = ({ isOpen, user, onLogout, discover, onClose }) => {
                     href={`#${section.toLowerCase().replace(" ", "-")}`}
                     style={{
                       ...mobileLinkStyle,
-                      fontSize: "1rem",
-                      backgroundColor: "#f0f0f0",
+                      fontSize: "14px",
+                      backgroundColor: "rgba(249, 250, 251, 0.8)",
+                      color: "#6b7280",
                     }}
                     onClick={onClose}
-                    onMouseEnter={handleLinkHover}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+                      e.target.style.color = "#8b5cf6";
+                      e.target.style.borderColor = "rgba(139, 92, 246, 0.2)";
+                    }}
                     onMouseLeave={(e) => {
-                      e.target.style.transform = "translate(0, 0)";
-                      e.target.style.boxShadow = "4px 4px 0px #000";
-                      e.target.style.backgroundColor = "#f0f0f0";
-                      e.target.style.color = "#2d2d2d";
+                      e.target.style.backgroundColor = "rgba(249, 250, 251, 0.8)";
+                      e.target.style.color = "#6b7280";
+                      e.target.style.borderColor = "rgba(229, 231, 235, 0.3)";
                     }}
                   >
                     {section}
@@ -305,7 +291,7 @@ const MobileMenu = ({ isOpen, user, onLogout, discover, onClose }) => {
               </div>
             )}
 
-            <div style={{ marginTop: "30px", textAlign: "center" }}>
+            <div style={{ marginTop: "30px" }}>
               <UserProfileDropdown user={user} onLogout={onLogout} />
             </div>
           </>
@@ -315,8 +301,16 @@ const MobileMenu = ({ isOpen, user, onLogout, discover, onClose }) => {
               href="/about_us"
               style={mobileLinkStyle}
               onClick={onClose}
-              onMouseEnter={handleLinkHover}
-              onMouseLeave={handleLinkLeave}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+                e.target.style.color = "#8b5cf6";
+                e.target.style.borderColor = "rgba(139, 92, 246, 0.2)";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+                e.target.style.color = "#374151";
+                e.target.style.borderColor = "rgba(229, 231, 235, 0.3)";
+              }}
             >
               About Us
             </a>
@@ -324,17 +318,36 @@ const MobileMenu = ({ isOpen, user, onLogout, discover, onClose }) => {
               href="/#why-skill-swap"
               style={mobileLinkStyle}
               onClick={onClose}
-              onMouseEnter={handleLinkHover}
-              onMouseLeave={handleLinkLeave}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+                e.target.style.color = "#8b5cf6";
+                e.target.style.borderColor = "rgba(139, 92, 246, 0.2)";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+                e.target.style.color = "#374151";
+                e.target.style.borderColor = "rgba(229, 231, 235, 0.3)";
+              }}
             >
               Why SkillSwap
             </a>
             <a
               href="/login"
-              style={mobileLinkStyle}
+              style={{
+                ...mobileLinkStyle,
+                backgroundColor: "#8b5cf6",
+                color: "white",
+                borderColor: "#8b5cf6",
+              }}
               onClick={onClose}
-              onMouseEnter={handleLinkHover}
-              onMouseLeave={handleLinkLeave}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "#7c3aed";
+                e.target.style.borderColor = "#7c3aed";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "#8b5cf6";
+                e.target.style.borderColor = "#8b5cf6";
+              }}
             >
               Login/Register
             </a>
@@ -353,7 +366,7 @@ const Header = () => {
   useEffect(() => {
     // Simulate user data - replace with actual user context
     const userData = {
-      username: "johndoe",
+      username: "User",
       picture: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=32&h=32&fit=crop&crop=face"
     };
     setUser(userData);
@@ -379,12 +392,14 @@ const Header = () => {
   };
 
   const navbarStyle = {
-    background: "#fff",
+    background: "rgba(255, 255, 255, 0.95)",
+    backdropFilter: "blur(10px)",
     border: "none",
-    borderBottom: "1px solid #000",
-    boxShadow: "0px 2px 0px #000",
-    padding: "15px 30px",
-    position: "relative",
+    borderBottom: "1px solid rgba(229, 231, 235, 0.3)",
+    boxShadow: "0 2px 20px rgba(0, 0, 0, 0.08)",
+    padding: "16px 30px",
+    position: "sticky",
+    top: 0,
     zIndex: 998,
   };
 
@@ -397,16 +412,16 @@ const Header = () => {
   };
 
   const logoStyle = {
-    fontSize: "2rem",
+    fontSize: "1.8rem",
     fontWeight: "800",
     textDecoration: "none",
-    letterSpacing: "-1px",
-    WebkitBackgroundClip: "text",
-    backgroundClip: "text",
+    letterSpacing: "-0.5px",
+    display: "flex",
+    alignItems: "center",
   };
 
   const brandText1 = {
-    color: "#000",
+    color: "#374151",
   };
 
   const brandText2 = {
@@ -416,59 +431,42 @@ const Header = () => {
   const desktopNavStyle = {
     display: "flex",
     alignItems: "center",
-    gap: "20px",
+    gap: "16px",
   };
 
   const navLinkStyle = {
-    color: "#2d2d2d",
+    color: "#4b5563",
     textDecoration: "none",
-    fontSize: "1rem",
+    fontSize: "14px",
     fontWeight: "600",
-    padding: "10px 20px",
-    backgroundColor: "white",
-    border: "3px solid #000",
-    borderRadius: "12px",
-    boxShadow: "4px 4px 0px #000",
-    transition: "all 0.1s ease",
-    transform: "translate(0, 0)",
+    padding: "10px 16px",
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    border: "1px solid rgba(229, 231, 235, 0.3)",
+    borderRadius: "8px",
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+    transition: "all 0.2s ease",
     display: "inline-block",
   };
 
+  const primaryNavLinkStyle = {
+    ...navLinkStyle,
+    backgroundColor: "#8b5cf6",
+    color: "white",
+    borderColor: "#8b5cf6",
+  };
+
   const mobileToggleStyle = {
-    backgroundColor: "white",
-    border: "3px solid #000",
-    borderRadius: "12px",
-    padding: "10px 15px",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    border: "1px solid rgba(229, 231, 235, 0.3)",
+    borderRadius: "8px",
+    padding: "10px 12px",
     cursor: "pointer",
-    fontSize: "1.2rem",
-    fontWeight: "bold",
-    boxShadow: "4px 4px 0px #000",
-    transition: "all 0.1s ease",
+    fontSize: "18px",
+    fontWeight: "500",
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+    transition: "all 0.2s ease",
     display: "none",
-  };
-
-  const handleNavLinkHover = (e) => {
-    e.target.style.transform = "translate(-2px, -2px)";
-    e.target.style.boxShadow = "6px 6px 0px #000";
-    e.target.style.backgroundColor = "#8b5cf6";
-    e.target.style.color = "white";
-  };
-
-  const handleNavLinkLeave = (e) => {
-    e.target.style.transform = "translate(0, 0)";
-    e.target.style.boxShadow = "4px 4px 0px #000";
-    e.target.style.backgroundColor = "white";
-    e.target.style.color = "#2d2d2d";
-  };
-
-  const handleNavLinkMouseDown = (e) => {
-    e.target.style.transform = "translate(2px, 2px)";
-    e.target.style.boxShadow = "2px 2px 0px #000";
-  };
-
-  const handleNavLinkMouseUp = (e) => {
-    e.target.style.transform = "translate(-2px, -2px)";
-    e.target.style.boxShadow = "6px 6px 0px #000";
+    color: "#6b7280",
   };
 
   return (
@@ -476,8 +474,8 @@ const Header = () => {
       <nav style={navbarStyle}>
         <div style={containerStyle}>
           <a href="/" style={logoStyle}>
-            <span style={brandText1} className="brandText1">Skill</span>
-            <span style={brandText2} className="text1">Swap</span>
+            <span style={brandText1}>Skill</span>
+            <span style={brandText2}>Swap</span>
           </a>
 
           {/* Desktop Navigation */}
@@ -485,10 +483,16 @@ const Header = () => {
             <a
               href="/"
               style={navLinkStyle}
-              onMouseEnter={handleNavLinkHover}
-              onMouseLeave={handleNavLinkLeave}
-              onMouseDown={handleNavLinkMouseDown}
-              onMouseUp={handleNavLinkMouseUp}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+                e.target.style.color = "#8b5cf6";
+                e.target.style.borderColor = "rgba(139, 92, 246, 0.2)";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+                e.target.style.color = "#4b5563";
+                e.target.style.borderColor = "rgba(229, 231, 235, 0.3)";
+              }}
             >
               Home
             </a>
@@ -498,20 +502,32 @@ const Header = () => {
                 <a
                   href="/discover"
                   style={navLinkStyle}
-                  onMouseEnter={handleNavLinkHover}
-                  onMouseLeave={handleNavLinkLeave}
-                  onMouseDown={handleNavLinkMouseDown}
-                  onMouseUp={handleNavLinkMouseUp}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+                    e.target.style.color = "#8b5cf6";
+                    e.target.style.borderColor = "rgba(139, 92, 246, 0.2)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+                    e.target.style.color = "#4b5563";
+                    e.target.style.borderColor = "rgba(229, 231, 235, 0.3)";
+                  }}
                 >
                   Discover
                 </a>
                 <a
                   href="/chats"
                   style={navLinkStyle}
-                  onMouseEnter={handleNavLinkHover}
-                  onMouseLeave={handleNavLinkLeave}
-                  onMouseDown={handleNavLinkMouseDown}
-                  onMouseUp={handleNavLinkMouseUp}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+                    e.target.style.color = "#8b5cf6";
+                    e.target.style.borderColor = "rgba(139, 92, 246, 0.2)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+                    e.target.style.color = "#4b5563";
+                    e.target.style.borderColor = "rgba(229, 231, 235, 0.3)";
+                  }}
                 >
                   Your Chats
                 </a>
@@ -522,42 +538,46 @@ const Header = () => {
                 <a
                   href="/about_us"
                   style={navLinkStyle}
-                  onMouseEnter={handleNavLinkHover}
-                  onMouseLeave={handleNavLinkLeave}
-                  onMouseDown={handleNavLinkMouseDown}
-                  onMouseUp={handleNavLinkMouseUp}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+                    e.target.style.color = "#8b5cf6";
+                    e.target.style.borderColor = "rgba(139, 92, 246, 0.2)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+                    e.target.style.color = "#4b5563";
+                    e.target.style.borderColor = "rgba(229, 231, 235, 0.3)";
+                  }}
                 >
                   About Us
                 </a>
                 <a
                   href="/#why-skill-swap"
                   style={navLinkStyle}
-                  onMouseEnter={handleNavLinkHover}
-                  onMouseLeave={handleNavLinkLeave}
-                  onMouseDown={handleNavLinkMouseDown}
-                  onMouseUp={handleNavLinkMouseUp}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+                    e.target.style.color = "#8b5cf6";
+                    e.target.style.borderColor = "rgba(139, 92, 246, 0.2)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+                    e.target.style.color = "#4b5563";
+                    e.target.style.borderColor = "rgba(229, 231, 235, 0.3)";
+                  }}
                 >
                   Why SkillSwap
                 </a>
                 <a
                   href="/login"
-                  style={{
-                    ...navLinkStyle,
-                    backgroundColor: "#8b5cf6",
-                    color: "white",
-                  }}
+                  style={primaryNavLinkStyle}
                   onMouseEnter={(e) => {
-                    e.target.style.transform = "translate(-2px, -2px)";
-                    e.target.style.boxShadow = "6px 6px 0px #000";
                     e.target.style.backgroundColor = "#7c3aed";
+                    e.target.style.borderColor = "#7c3aed";
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.transform = "translate(0, 0)";
-                    e.target.style.boxShadow = "4px 4px 0px #000";
                     e.target.style.backgroundColor = "#8b5cf6";
+                    e.target.style.borderColor = "#8b5cf6";
                   }}
-                  onMouseDown={handleNavLinkMouseDown}
-                  onMouseUp={handleNavLinkMouseUp}
                 >
                   Login/Register
                 </a>
@@ -571,12 +591,12 @@ const Header = () => {
             className="mobile-toggle"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             onMouseEnter={(e) => {
-              e.target.style.transform = "translate(-1px, -1px)";
-              e.target.style.boxShadow = "5px 5px 0px #000";
+              e.target.style.backgroundColor = "rgba(139, 92, 246, 0.1)";
+              e.target.style.color = "#8b5cf6";
             }}
             onMouseLeave={(e) => {
-              e.target.style.transform = "translate(0, 0)";
-              e.target.style.boxShadow = "4px 4px 0px #000";
+              e.target.style.backgroundColor = "rgba(255, 255, 255, 0.9)";
+              e.target.style.color = "#6b7280";
             }}
           >
             ☰

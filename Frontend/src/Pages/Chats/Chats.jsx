@@ -1,72 +1,55 @@
+
 import React, { useEffect, useState } from "react";
 import Button from "react-bootstrap/Button";
 import ListGroup from "react-bootstrap/ListGroup";
 import Form from "react-bootstrap/Form";
+import Tabs from "react-bootstrap/Tabs";
+import Tab from "react-bootstrap/Tab";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useUser } from "../../util/UserContext";
 import Spinner from "react-bootstrap/Spinner";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import io from "socket.io-client";
 import ScrollableFeed from "react-scrollable-feed";
 import RequestCard from "./RequestCard";
 import "./Chats.css";
-import Modal from "react-bootstrap/Modal";
 
-var socket;
+const socket = io(axios.defaults.baseURL);
+
 const Chats = () => {
-  const [showChatHistory, setShowChatHistory] = useState(true);
-  const [showRequests, setShowRequests] = useState(null);
+  const [activeKey, setActiveKey] = useState("chat");
   const [requests, setRequests] = useState([]);
   const [requestLoading, setRequestLoading] = useState(false);
   const [acceptRequestLoading, setAcceptRequestLoading] = useState(false);
-
   const [scheduleModalShow, setScheduleModalShow] = useState(false);
+  const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
   const [requestModalShow, setRequestModalShow] = useState(false);
-
-  // to store selected chat
   const [selectedChat, setSelectedChat] = useState(null);
-  // to store chat messages
   const [chatMessages, setChatMessages] = useState([]);
-  // to store chats
   const [chats, setChats] = useState([]);
   const [chatLoading, setChatLoading] = useState(true);
   const [chatMessageLoading, setChatMessageLoading] = useState(false);
-  // to store message
   const [message, setMessage] = useState("");
-
+  const [sendMessageLoading, setSendMessageLoading] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
-
   const { user, setUser } = useUser();
-
   const navigate = useNavigate();
-
-  const [scheduleForm, setScheduleForm] = useState({
-    date: "",
-    time: "",
-  });
+  const [scheduleForm, setScheduleForm] = useState({ date: "", time: "" });
+  const [isInputFocused, setIsInputFocused] = useState({});
 
   useEffect(() => {
     fetchChats();
   }, []);
 
   useEffect(() => {
-    socket = io(axios.defaults.baseURL);
-    if (user) {
-      socket.emit("setup", user);
-    }
+    if (user) socket.emit("setup", user);
     socket.on("message recieved", (newMessageRecieved) => {
-      console.log("New Message Recieved: ", newMessageRecieved);
-      console.log("Selected Chat: ", selectedChat);
-      console.log("Selected Chat ID: ", selectedChat.id);
-      console.log("New Message Chat ID: ", newMessageRecieved.chatId._id);
       if (selectedChat && selectedChat.id === newMessageRecieved.chatId._id) {
-        setChatMessages((prevState) => [...prevState, newMessageRecieved]);
+        setChatMessages((prev) => [...prev, newMessageRecieved]);
       }
     });
-    return () => {
-      socket.off("message recieved");
-    };
+    return () => socket.off("message recieved");
   }, [selectedChat]);
 
   const fetchChats = async () => {
@@ -74,64 +57,39 @@ const Chats = () => {
       setChatLoading(true);
       const tempUser = JSON.parse(localStorage.getItem("userInfo"));
       const { data } = await axios.get("http://localhost:8000/chat");
-      console.log("Raw Chats Data:", data.data);
       toast.success(data.message);
       if (tempUser?._id) {
         const temp = data.data.map((chat) => {
           const otherUser = chat?.users.find((u) => u?._id !== tempUser?._id);
           const latestMessage = chat?.latestMessage;
-          
-          console.log("Processing chat:", chat._id, "Latest message:", latestMessage);
-          
-          // Check if the latest message is a request-related message
-          const isRequestMessage = latestMessage?.content?.includes("Connection Request") || 
-                                 latestMessage?.content?.includes("Connection Accepted") || 
-                                 latestMessage?.content?.includes("Connection Declined");
-          
-          const processedChat = {
+          const isRequestMessage =
+            latestMessage?.type === "callRequest" ||
+            latestMessage?.content?.includes("Connection Request") ||
+            latestMessage?.content?.includes("Connection Accepted") ||
+            latestMessage?.content?.includes("Connection Declined");
+          return {
             id: chat._id,
             name: otherUser?.name,
             picture: otherUser?.picture,
             username: otherUser?.username,
             latestMessage: latestMessage?.content,
-            isRequestMessage: isRequestMessage,
+            isRequestMessage,
             hasUnreadRequest: isRequestMessage && latestMessage?.sender?._id !== tempUser?._id,
           };
-          
-          console.log("Processed chat:", processedChat);
-          return processedChat;
-        });
-        
-        // Sort chats to show request-related chats first
-        temp.sort((a, b) => {
-          if (a.isRequestMessage && !b.isRequestMessage) return -1;
-          if (!a.isRequestMessage && b.isRequestMessage) return 1;
-          return 0;
-        });
-        
+        }).sort((a, b) => (a.isRequestMessage && !b.isRequestMessage ? -1 : b.isRequestMessage && !a.isRequestMessage ? 1 : 0));
         setChats(temp);
       }
-      // console.log(temp);
     } catch (err) {
-      console.log(err);
-      if (err?.response?.data?.message) {
-        toast.error(err.response.data.message);
-        if (err.response.data.message === "Please Login") {
-          localStorage.removeItem("userInfo");
-          setUser(null);
-          await axios.get("/auth/logout");
-          navigate("/login");
-        }
-      } else {
-        toast.error("Something went wrong");
+      toast.error(err?.response?.data?.message || "Something went wrong");
+      if (err?.response?.data?.message === "Please Login") {
+        localStorage.removeItem("userInfo");
+        setUser(null);
+        axios.get("/auth/logout");
+        navigate("/login");
       }
     } finally {
       setChatLoading(false);
     }
-  };
-
-  const handleScheduleClick = () => {
-    setScheduleModalShow(true);
   };
 
   const handleChatClick = async (chatId) => {
@@ -139,60 +97,44 @@ const Chats = () => {
       setChatMessageLoading(true);
       const { data } = await axios.get(`http://localhost:8000/message/getMessages/${chatId}`);
       setChatMessages(data.data);
-      // console.log("Chat Messages:", data.data);
       setMessage("");
-      // console.log("Chats: ", chats);
       const chatDetails = chats.find((chat) => chat.id === chatId);
       setSelectedChat(chatDetails);
-      // console.log("selectedChat", chatDetails);
-      // console.log("Data", data.message);
       socket.emit("join chat", chatId);
       toast.success(data.message);
     } catch (err) {
-      console.log(err);
-      if (err?.response?.data?.message) {
-        toast.error(err.response.data.message);
-        if (err.response.data.message === "Please Login") {
-          localStorage.removeItem("userInfo");
-          setUser(null);
-          await axios.get("/auth/logout");
-          navigate("/login");
-        }
-      } else {
-        toast.error("Something went wrong");
+      toast.error(err?.response?.data?.message || "Something went wrong");
+      if (err?.response?.data?.message === "Please Login") {
+        localStorage.removeItem("userInfo");
+        setUser(null);
+        axios.get("/auth/logout");
+        navigate("/login");
       }
     } finally {
       setChatMessageLoading(false);
     }
   };
 
-  const sendMessage = async (e) => {
+  const sendMessage = async () => {
+    if (message === "") return toast.error("Message is empty");
+    if (sendMessageLoading) return;
     try {
-      socket.emit("stop typing", selectedChat._id);
-      if (message === "") {
-        toast.error("Message is empty");
-        return;
-      }
+      setSendMessageLoading(true);
       const { data } = await axios.post("/message/sendMessage", { chatId: selectedChat.id, content: message });
-      // console.log("after sending message", data);
       socket.emit("new message", data.data);
-      setChatMessages((prevState) => [...prevState, data.data]);
+      setChatMessages((prev) => [...prev, data.data]);
       setMessage("");
-      // console.log("Data", data.message);
       toast.success(data.message);
     } catch (err) {
-      console.log(err);
-      if (err?.response?.data?.message) {
-        toast.error(err.response.data.message);
-        if (err.response.data.message === "Please Login") {
-          await axios.get("/auth/logout");
-          setUser(null);
-          localStorage.removeItem("userInfo");
-          navigate("/login");
-        }
-      } else {
-        toast.error("Something went wrong");
+      toast.error(err?.response?.data?.message || "Something went wrong");
+      if (err?.response?.data?.message === "Please Login") {
+        localStorage.removeItem("userInfo");
+        setUser(null);
+        axios.get("/auth/logout");
+        navigate("/login");
       }
+    } finally {
+      setSendMessageLoading(false);
     }
   };
 
@@ -201,35 +143,17 @@ const Chats = () => {
       setRequestLoading(true);
       const { data } = await axios.get("/request/getRequests");
       setRequests(data.data);
-      console.log(data.data);
       toast.success(data.message);
     } catch (err) {
-      console.log(err);
-      if (err?.response?.data?.message) {
-        toast.error(err.response.data.message);
-        if (err.response.data.message === "Please Login") {
-          await axios.get("/auth/logout");
-          setUser(null);
-          localStorage.removeItem("userInfo");
-          navigate("/login");
-        }
-      } else {
-        toast.error("Something went wrong");
+      toast.error(err?.response?.data?.message || "Something went wrong");
+      if (err?.response?.data?.message === "Please Login") {
+        localStorage.removeItem("userInfo");
+        setUser(null);
+        axios.get("/auth/logout");
+        navigate("/login");
       }
     } finally {
       setRequestLoading(false);
-    }
-  };
-
-  const handleTabClick = async (tab) => {
-    if (tab === "chat") {
-      setShowChatHistory(true);
-      setShowRequests(false);
-      await fetchChats();
-    } else if (tab === "requests") {
-      setShowChatHistory(false);
-      setShowRequests(true);
-      await getRequests();
     }
   };
 
@@ -238,30 +162,20 @@ const Chats = () => {
     setRequestModalShow(true);
   };
 
-  const handleRequestAccept = async (e) => {
-    console.log("Request accepted");
-
+  const handleRequestAccept = async () => {
     try {
       setAcceptRequestLoading(true);
       const { data } = await axios.post("/request/acceptRequest", { requestId: selectedRequest._id });
-      console.log(data);
       toast.success(data.message);
-      // remove this request from the requests list
-      setRequests((prevState) => prevState.filter((request) => request._id !== selectedRequest._id));
-      // refresh chats to show the updated conversation
+      setRequests((prev) => prev.filter((request) => request._id !== selectedRequest._id));
       await fetchChats();
     } catch (err) {
-      console.log(err);
-      if (err?.response?.data?.message) {
-        toast.error(err.response.data.message);
-        if (err.response.data.message === "Please Login") {
-          await axios.get("/auth/logout");
-          setUser(null);
-          localStorage.removeItem("userInfo");
-          navigate("/login");
-        }
-      } else {
-        toast.error("Something went wrong");
+      toast.error(err?.response?.data?.message || "Something went wrong");
+      if (err?.response?.data?.message === "Please Login") {
+        localStorage.removeItem("userInfo");
+        setUser(null);
+        axios.get("/auth/logout");
+        navigate("/login");
       }
     } finally {
       setAcceptRequestLoading(false);
@@ -270,27 +184,19 @@ const Chats = () => {
   };
 
   const handleRequestReject = async () => {
-    console.log("Request rejected");
     try {
       setAcceptRequestLoading(true);
       const { data } = await axios.post("/request/rejectRequest", { requestId: selectedRequest._id });
-      console.log(data);
       toast.success(data.message);
-      setRequests((prevState) => prevState.filter((request) => request._id !== selectedRequest._id));
-      // refresh chats to show the updated conversation
+      setRequests((prev) => prev.filter((request) => request._id !== selectedRequest._id));
       await fetchChats();
     } catch (err) {
-      console.log(err);
-      if (err?.response?.data?.message) {
-        toast.error(err.response.data.message);
-        if (err.response.data.message === "Please Login") {
-          await axios.get("/auth/logout");
-          setUser(null);
-          localStorage.removeItem("userInfo");
-          navigate("/login");
-        }
-      } else {
-        toast.error("Something went wrong");
+      toast.error(err?.response?.data?.message || "Something went wrong");
+      if (err?.response?.data?.message === "Please Login") {
+        localStorage.removeItem("userInfo");
+        setUser(null);
+        axios.get("/auth/logout");
+        navigate("/login");
       }
     } finally {
       setAcceptRequestLoading(false);
@@ -298,446 +204,578 @@ const Chats = () => {
     }
   };
 
-  return (
-    <div className="container-overall">
-      <div className="container-right">
-        {/* Chat History */}
-        <div className="container-left">
-          {/* Tabs */}
-          <div className="tabs" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex" }}>
-              <Button
-                className="chatButton"
-                variant="secondary"
-                style={{
-                  borderTop: showChatHistory ? "1px solid lightgrey" : "1px solid lightgrey",
-                  borderRight: showChatHistory ? "1px solid lightgrey" : "1px solid lightgrey",
-                  borderLeft: showChatHistory ? "1px solid lightgrey" : "1px solid lightgrey",
-                  borderBottom: "none",
-                  backgroundColor: showChatHistory ? "#3bb4a1" : "#2d2d2d",
-                  color: showChatHistory ? "black" : "white",
-                  cursor: "pointer",
-                  minWidth: "150px",
-                  padding: "10px",
-                  borderRadius: "5px 5px 0 0",
-                }}
-                onClick={() => handleTabClick("chat")}
-              >
-                Chat History
-              </Button>
-              <Button
-                className="requestButton"
-                variant="secondary"
-                style={{
-                  borderTop: showRequests ? "1px solid lightgrey" : "1px solid lightgrey",
-                  borderRight: showRequests ? "1px solid lightgrey" : "1px solid lightgrey",
-                  borderLeft: showRequests ? "1px solid lightgrey" : "1px solid lightgrey",
-                  borderBottom: "none",
-                  backgroundColor: showChatHistory ? "#2d2d2d" : "#3bb4a1",
-                  color: showChatHistory ? "white" : "black",
-                  cursor: "pointer",
-                  minWidth: "150px",
-                  padding: "10px",
-                  borderRadius: "5px 5px 0 0",
-                }}
-                onClick={() => handleTabClick("requests")}
-              >
-                Requests
-              </Button>
-            </div>
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={fetchChats}
-              style={{ marginLeft: "10px" }}
-            >
-              🔄 Refresh
-            </Button>
-          </div>
+  // Event handlers for interactive elements
+  const handleButtonHover = (e) => {
+    e.target.style.backgroundColor = "#7c3aed";
+    e.target.style.transform = "translateY(-2px)";
+    e.target.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.15)";
+  };
 
-          {/* Chat History or Requests List */}
-          {showChatHistory && (
-            <div className="container-left">
-              <ListGroup className="chat-list">
-                {chatLoading ? (
-                  <div className="row m-auto mt-5">
-                    <Spinner animation="border" variant="primary" />
-                  </div>
-                ) : (
-                  <>
-                    {chats.map((chat) => (
-                      <ListGroup.Item
-                        key={chat.id}
-                        onClick={() => handleChatClick(chat.id)}
-                        style={{
-                          cursor: "pointer",
-                          marginBottom: "10px",
-                          padding: "15px",
-                          backgroundColor: selectedChat?.id === chat?.id ? "#3BB4A1" : 
-                                         chat.isRequestMessage ? "#fff3cd" : "lightgrey",
-                          borderRadius: "8px",
-                          border: chat.isRequestMessage ? "2px solid #ffc107" : "1px solid #ddd",
-                          position: "relative",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <div style={{ display: "flex", alignItems: "center" }}>
-                            {chat.picture && (
-                              <img
-                                src={chat.picture}
-                                alt={chat.name}
-                                style={{
-                                  width: "40px",
-                                  height: "40px",
-                                  borderRadius: "50%",
-                                  marginRight: "10px",
-                                  border: "2px solid #fff",
-                                }}
-                              />
-                            )}
-                            <div>
-                              <div style={{ 
-                                fontWeight: "bold", 
-                                color: chat.isRequestMessage ? "#856404" : "#333",
-                                fontSize: "16px"
-                              }}>
-                        {chat.name}
-                                {chat.isRequestMessage && " 🔔"}
-                              </div>
-                              {chat.latestMessage && (
-                                <div style={{ 
-                                  fontSize: "12px", 
-                                  color: "#666", 
-                                  marginTop: "2px",
-                                  maxWidth: "200px",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap"
-                                }}>
-                                  {chat.latestMessage}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          {chat.hasUnreadRequest && (
-                            <div style={{
-                              width: "12px",
-                              height: "12px",
-                              backgroundColor: "#ff4444",
-                              borderRadius: "50%",
-                              marginLeft: "10px"
-                            }} />
-                          )}
-                        </div>
-                      </ListGroup.Item>
-                    ))}
-                  </>
-                )}
-              </ListGroup>
-            </div>
-          )}
-          {showRequests && (
-            <div className="container-left">
-              <ListGroup style={{ padding: "10px" }}>
-                {requestLoading ? (
-                  <div className="row m-auto mt-5">
-                    <Spinner animation="border" variant="primary" />
-                  </div>
-                ) : (
-                  <>
-                    {requests.map((request) => (
-                      <ListGroup.Item
-                        key={request.id}
-                        onClick={() => handleRequestClick(request)}
-                        style={{
-                          cursor: "pointer",
-                          marginBottom: "10px",
-                          padding: "10px",
-                          backgroundColor:
-                            selectedRequest && selectedRequest.id === request.id ? "#3BB4A1" : "lightgrey",
-                          borderRadius: "5px",
-                        }}
-                      >
-                        {request.name}
-                      </ListGroup.Item>
-                    ))}
-                  </>
-                )}
-              </ListGroup>
-            </div>
-          )}
-          {requestModalShow && (
-            <div className="modalBG" onClick={() => setRequestModalShow(false)}>
-              <div className="modalContent">
-                <h2 style={{ textAlign: "center" }}>Confirm your choice?</h2>
-                {selectedRequest && (
-                  <RequestCard
-                    name={selectedRequest?.name}
-                    skills={selectedRequest?.skillsProficientAt}
-                    rating="4"
-                    picture={selectedRequest?.picture}
-                    username={selectedRequest?.username}
-                    onClose={() => setSelectedRequest(null)} // Close modal when clicked outside or close button
-                  />
-                )}
-                <div style={{ display: "flex", justifyContent: "center" }}>
-                  <button className="connect-button" style={{ marginLeft: "0" }} onClick={handleRequestAccept}>
-                    {acceptRequestLoading ? (
-                      <div className="row m-auto ">
-                        <Spinner animation="border" variant="primary" />
-                      </div>
-                    ) : (
-                      "Accept!"
-                    )}
-                  </button>
-                  <button className="report-button" onClick={handleRequestReject}>
-                    {acceptRequestLoading ? (
-                      <div className="row m-auto ">
-                        <Spinner animation="border" variant="primary" />
-                      </div>
-                    ) : (
-                      "Reject"
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-        {/* Right Section */}
-        <div className="container-chat">
-          {/* Profile Bar */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              padding: "10px",
-              borderBottom: "1px solid #2d2d2d",
-              minHeight: "50px",
+  const handleButtonLeave = (e) => {
+    e.target.style.backgroundColor = "#8b5cf6";
+    e.target.style.transform = "translateY(0)";
+    e.target.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1)";
+  };
+
+  const handleButtonMouseDown = (e) => {
+    e.target.style.transform = "translateY(1px)";
+    e.target.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.1)";
+  };
+
+  const handleButtonMouseUp = (e) => {
+    e.target.style.transform = "translateY(-2px)";
+    e.target.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.15)";
+  };
+
+  const handleCardHover = (e) => {
+    e.currentTarget.style.transform = "translateY(-2px)";
+    e.currentTarget.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.15)";
+  };
+
+  const handleCardLeave = (e) => {
+    e.currentTarget.style.transform = "translateY(0)";
+    e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1)";
+  };
+
+  const handleCardMouseDown = (e) => {
+    e.currentTarget.style.transform = "translateY(1px)";
+    e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.1)";
+  };
+
+  const handleCardMouseUp = (e) => {
+    e.currentTarget.style.transform = "translateY(-2px)";
+    e.currentTarget.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.15)";
+  };
+
+  // Styles
+  const containerStyle = {
+    height: "88vh",
+    width: "100vw",
+    overflow: "hidden",
+    background: "linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)",
+    display: "flex",
+    flexDirection: "column",
+  };
+
+  const sectionStyle = {
+    flex: 1,
+    width: "100%",
+    margin: "0 auto",
+    display: "flex",
+    gap: "20px",
+    backgroundColor: "#ffffff",
+    borderRadius: "8px",
+    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+    overflow: "hidden",
+  };
+
+  const leftSectionStyle = {
+    flex: "1",
+    minWidth: "300px",
+    padding: "20px",
+    backgroundColor: "#ffffff",
+    borderRight: "1px solid #e5e7eb",
+  };
+
+  const rightSectionStyle = {
+    flex: "2",
+    minWidth: "300px",
+    display: "flex",
+    flexDirection: "column",
+    backgroundColor: "#ffffff",
+    padding: "20px",
+  };
+
+  const inputStyle = (name) => ({
+    padding: "10px 15px",
+    fontSize: "1rem",
+    borderRadius: "6px",
+    border: `1px solid ${isInputFocused[name] ? "#8b5cf6" : "#d1d5db"}`,
+    backgroundColor: "#f9fafb",
+    width: "100%",
+    outline: "none",
+    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+    boxShadow: isInputFocused[name] ? "0 0 0 3px rgba(139, 92, 246, 0.1)" : "none",
+  });
+
+  const buttonStyle = {
+    backgroundColor: "#8b5cf6",
+    color: "white",
+    border: "none",
+    padding: "10px 20px",
+    fontSize: "0.9rem",
+    fontWeight: "600",
+    borderRadius: "6px",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+    textTransform: "uppercase",
+  };
+
+  return (
+    <div style={containerStyle}>
+
+      <div style={sectionStyle}>
+        {/* Left Section */}
+        <div style={leftSectionStyle}>
+          <Tabs
+            activeKey={activeKey}
+            onSelect={(k) => {
+              setActiveKey(k);
+              if (k === "chat") fetchChats();
+              else if (k === "requests") getRequests();
             }}
+            className="custom-tabs"
           >
-            {/* Profile Info (Placeholder) */}
-            {selectedChat && (
+            <Tab eventKey="chat" title="Chat History">
+              <ListGroup style={{ marginTop: "15px" }}>
+                {chatLoading ? (
+                  <div style={{ display: "flex", justifyContent: "center", marginTop: "30px" }}>
+                    <Spinner animation="border" style={{ color: "#8b5cf6" }} />
+                  </div>
+                ) : (
+                  chats.map((chat) => (
+                    <ListGroup.Item
+                      key={chat.id}
+                      onClick={() => handleChatClick(chat.id)}
+                      style={{
+                        cursor: "pointer",
+                        marginBottom: "8px",
+                        padding: "12px",
+                        backgroundColor: selectedChat?.id === chat.id ? "#f3f4f6" : chat.isRequestMessage ? "#fef3c7" : "#ffffff",
+                        borderRadius: "6px",
+                        border: "1px solid #e5e7eb",
+                        transition: "all 0.2s ease",
+                        boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+                      }}
+                      onMouseEnter={handleCardHover}
+                      onMouseLeave={handleCardLeave}
+                      onMouseDown={handleCardMouseDown}
+                      onMouseUp={handleCardMouseUp}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          {chat.picture && (
+                            <img
+                              src={chat.picture}
+                              alt={chat.name}
+                              style={{
+                                width: "32px",
+                                height: "32px",
+                                borderRadius: "50%",
+                                marginRight: "10px",
+                                border: "1px solid #e5e7eb",
+                              }}
+                            />
+                          )}
+                          <div>
+                            <div style={{
+                              fontWeight: "600",
+                              color: chat.isRequestMessage ? "#854d0e" : "#1f2937",
+                              fontSize: "1rem",
+                            }}>
+                              {chat.name} {chat.isRequestMessage && <span style={{ color: "#f59e0b" }}>🔔</span>}
+                            </div>
+                            {chat.latestMessage && (
+                              <div style={{
+                                fontSize: "0.85rem",
+                                color: "#6b7280",
+                                marginTop: "2px",
+                                maxWidth: "200px",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}>
+                                {chat.latestMessage}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {chat.hasUnreadRequest && (
+                          <div style={{
+                            width: "10px",
+                            height: "10px",
+                            backgroundColor: "#ef4444",
+                            borderRadius: "50%",
+                            border: "1px solid #fff",
+                          }} />
+                        )}
+                      </div>
+                    </ListGroup.Item>
+                  ))
+                )}
+              </ListGroup>
+            </Tab>
+            <Tab eventKey="requests" title="Requests">
+              <ListGroup style={{ marginTop: "15px" }}>
+                {requestLoading ? (
+                  <div style={{ display: "flex", justifyContent: "center", marginTop: "30px" }}>
+                    <Spinner animation="border" style={{ color: "#8b5cf6" }} />
+                  </div>
+                ) : (
+                  requests.map((request) => (
+                    <ListGroup.Item
+                      key={request.id}
+                      onClick={() => handleRequestClick(request)}
+                      style={{
+                        cursor: "pointer",
+                        marginBottom: "8px",
+                        padding: "12px",
+                        backgroundColor: selectedRequest?.id === request.id ? "#f3f4f6" : "#ffffff",
+                        borderRadius: "6px",
+                        border: "1px solid #e5e7eb",
+                        transition: "all 0.2s ease",
+                        boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+                      }}
+                      onMouseEnter={handleCardHover}
+                      onMouseLeave={handleCardLeave}
+                      onMouseDown={handleCardMouseDown}
+                      onMouseUp={handleCardMouseUp}
+                    >
+                      {request.name}
+                    </ListGroup.Item>
+                  ))
+                )}
+              </ListGroup>
+            </Tab>
+          </Tabs>
+          <Button
+            style={{ ...buttonStyle, marginTop: "15px", width: "100%" }}
+            onClick={fetchChats}
+            onMouseEnter={handleButtonHover}
+            onMouseLeave={handleButtonLeave}
+            onMouseDown={handleButtonMouseDown}
+            onMouseUp={handleButtonMouseUp}
+          >
+            Refresh
+          </Button>
+        </div>
+
+        {/* Right Section */}
+        <div style={rightSectionStyle}>
+          <div style={{
+            padding: "10px 15px",
+            borderBottom: "1px solid #e5e7eb",
+            backgroundColor: "#ffffff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}>
+            {selectedChat ? (
               <>
-                <div>
+                <div style={{ display: "flex", alignItems: "center" }}>
                   <img
-                    src={selectedChat?.picture ? selectedChat.picture : "https://via.placeholder.com/150"}
+                    src={selectedChat.picture || "https://via.placeholder.com/150"}
                     alt="Profile"
-                    style={{ width: "40px", height: "40px", borderRadius: "50%", marginRight: "10px" }}
+                    style={{ width: "32px", height: "32px", borderRadius: "50%", marginRight: "10px", border: "1px solid #e5e7eb" }}
                   />
-                  <span style={{ fontFamily: "Montserrat, sans-serif", color: "#2d2d2d" }}>
-                    {selectedChat?.username}
+                  <span style={{ fontWeight: "600", color: "#1f2937", fontSize: "1rem" }}>
+                    {selectedChat.username}
                   </span>
                 </div>
-                <Button variant="info" onClick={handleScheduleClick}>
+                <Button
+                  style={buttonStyle}
+                  onClick={() => setScheduleModalShow(true)}
+                  onMouseEnter={handleButtonHover}
+                  onMouseLeave={handleButtonLeave}
+                  onMouseDown={handleButtonMouseDown}
+                  onMouseUp={handleButtonMouseUp}
+                >
                   Request Video Call
                 </Button>
               </>
+            ) : (
+              <span style={{ fontWeight: "600", color: "#1f2937", fontSize: "1rem" }}>
+                Select a chat to start messaging
+              </span>
             )}
-
-            {/* Schedule Video Call Button */}
           </div>
 
-          {/* Chat Interface */}
-          <div style={{ flex: "7", position: "relative", height: "calc(100vh - 160px)" }}>
-            {/* Chat Messages */}
-            <div
-              style={{
-                height: "calc(100% - 50px)",
-                color: "#3BB4A1",
-                padding: "20px",
-                overflowY: "auto",
-                position: "relative",
-              }}
-            >
-              {selectedChat ? (
-                <ScrollableFeed forceScroll="true">
-                  {chatMessages.map((message, index) => {
-                    // Check if this is a request-related message
-                    const isRequestMessage = message.content?.includes("Connection Request") || 
-                                           message.content?.includes("Connection Accepted") || 
-                                           message.content?.includes("Connection Declined");
-                    
-                    return (
+          <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            {selectedChat ? (
+              <ScrollableFeed forceScroll={true} style={{ flex: 1, overflowY: "auto", padding: "15px" }}>
+                {chatMessages.map((message, index) => {
+                  const isRequestMessage =
+                    message.type === "callRequest" ||
+                    message.content?.includes("Connection Request") ||
+                    message.content?.includes("Connection Accepted") ||
+                    message.content?.includes("Connection Declined");
+                  return (
+                    <div
+                      key={index}
+                      style={{
+                        display: "flex",
+                        justifyContent: isRequestMessage ? "center" : (message.sender._id === user._id ? "flex-end" : "flex-start"),
+                        marginBottom: "10px",
+                      }}
+                    >
                       <div
-                        key={index}
                         style={{
-                          display: "flex",
-                          justifyContent: isRequestMessage ? "center" : (message.sender._id == user._id ? "flex-end" : "flex-start"),
-                          marginBottom: "15px",
+                          backgroundColor: isRequestMessage
+                            ? message.content?.includes("Connection Accepted")
+                              ? "#d1fae5"
+                              : message.content?.includes("Connection Declined")
+                              ? "#fee2e2"
+                              : "#fef3c7"
+                            : message.sender._id === user._id
+                            ? "#e5e7eb"
+                            : "#8b5cf6",
+                          color: isRequestMessage
+                            ? message.content?.includes("Connection Accepted")
+                              ? "#065f46"
+                              : message.content?.includes("Connection Declined")
+                              ? "#991b1b"
+                              : "#854d0e"
+                            : message.sender._id === user._id
+                            ? "#1f2937"
+                            : "#ffffff",
+                          padding: isRequestMessage ? "12px 18px" : "8px 12px",
+                          borderRadius: "6px",
+                          maxWidth: isRequestMessage ? "80%" : "70%",
+                          textAlign: isRequestMessage ? "center" : (message.sender._id === user._id ? "right" : "left"),
+                          fontWeight: isRequestMessage ? "600" : "normal",
+                          fontSize: "0.9rem",
+                          border: isRequestMessage ? "1px solid #e5e7eb" : "none",
+                          boxShadow: isRequestMessage ? "0 2px 4px rgba(0, 0, 0, 0.1)" : "none",
                         }}
                       >
-                        <div
-                          style={{
-                            backgroundColor: isRequestMessage ? 
-                              (message.content?.includes("Connection Accepted") ? "#d4edda" :
-                               message.content?.includes("Connection Declined") ? "#f8d7da" :
-                               "#fff3cd") :
-                              (message.sender._id === user._id ? "#3BB4A1" : "#2d2d2d"),
-                            color: isRequestMessage ? 
-                              (message.content?.includes("Connection Accepted") ? "#155724" :
-                               message.content?.includes("Connection Declined") ? "#721c24" :
-                               "#856404") :
-                              "#ffffff",
-                            padding: isRequestMessage ? "15px 20px" : "10px",
-                            borderRadius: isRequestMessage ? "15px" : "10px",
-                            maxWidth: isRequestMessage ? "80%" : "70%",
-                            textAlign: isRequestMessage ? "center" : (message.sender._id == user._id ? "right" : "left"),
-                            border: isRequestMessage ? 
-                              (message.content?.includes("Connection Accepted") ? "2px solid #28a745" :
-                               message.content?.includes("Connection Declined") ? "2px solid #dc3545" :
-                               "2px solid #ffc107") : "none",
-                            fontWeight: isRequestMessage ? "600" : "normal",
-                            fontSize: isRequestMessage ? "14px" : "16px",
-                            boxShadow: isRequestMessage ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
-                          }}
-                        >
-                          {message.content}
-                        </div>
+                        {message.content}
                       </div>
-                    );
-                  })}
-                </ScrollableFeed>
-              ) : (
-                <>
-                  {chatMessageLoading ? (
-                    <div className="row h-100 d-flex justify-content-center align-items-center">
-                      <Spinner animation="border" variant="primary" />
                     </div>
-                  ) : (
-                    <div className="row w-100 h-100 d-flex justify-content-center align-items-center">
-                      <h3 className="row w-100 d-flex justify-content-center align-items-center">
-                        Select a chat to start messaging
-                      </h3>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Chat Input */}
-            {selectedChat && (
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "0",
-                  left: "0",
-                  right: "0",
-                  padding: "10px",
-                  borderTop: "1px solid #2d2d2d",
-                  display: "flex",
-                  alignItems: "center",
-                }}
-              >
-                <input
-                  type="text"
-                  placeholder="Type your message..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  style={{
-                    flex: "1",
-                    padding: "10px",
-                    borderRadius: "5px",
-                    marginRight: "10px",
-                    border: "1px solid #2d2d2d",
-                  }}
-                />
-                <Button variant="success" style={{ padding: "10px 20px", borderRadius: "5px" }} onClick={sendMessage}>
-                  Send
-                </Button>
+                  );
+                })}
+              </ScrollableFeed>
+            ) : (
+              <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                {chatMessageLoading ? (
+                  <Spinner animation="border" style={{ color: "#8b5cf6" }} />
+                ) : (
+                  <h3 style={{ color: "#6b7280", fontWeight: "600" }}>
+                    Select a chat to start messaging
+                  </h3>
+                )}
               </div>
             )}
           </div>
+
+          {selectedChat && (
+            <div style={{
+              padding: "10px 15px",
+              borderTop: "1px solid #e5e7eb",
+              backgroundColor: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+            }}>
+              <input
+                type="text"
+                placeholder="Type your message..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                style={inputStyle("message")}
+                onFocus={() => setIsInputFocused((prev) => ({ ...prev, message: true }))}
+                onBlur={() => setIsInputFocused((prev) => ({ ...prev, message: false }))}
+              />
+              <Button
+                style={{ ...buttonStyle, marginLeft: "10px" }}
+                onClick={sendMessage}
+                disabled={sendMessageLoading}
+                onMouseEnter={handleButtonHover}
+                onMouseLeave={handleButtonLeave}
+                onMouseDown={handleButtonMouseDown}
+                onMouseUp={handleButtonMouseUp}
+              >
+                {sendMessageLoading ? <Spinner animation="border" size="sm" /> : "Send"}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Schedule Video Call Modal */}
       {scheduleModalShow && (
-        <div
-          style={{
-            position: "fixed",
-            top: "0",
-            left: "0",
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(0, 0, 0, 0.7)",
-            zIndex: "500",
-          }}
-        >
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          zIndex: 1000,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}>
           <div
             style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              backgroundColor: "#2d2d2d",
-              color: "#3BB4A1",
-              padding: "50px",
-              borderRadius: "10px",
-              zIndex: "1001",
+              backgroundColor: "#ffffff",
+              borderRadius: "8px",
+              boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+              padding: "20px",
+              maxWidth: "400px",
+              width: "100%",
             }}
           >
-            <h3>Request a Meeting</h3>
+            <h3 style={{
+              fontSize: "1.5rem",
+              fontWeight: "600",
+              color: "#1f2937",
+              marginBottom: "20px",
+              textAlign: "center",
+            }}>
+              Request a Meeting
+            </h3>
             <Form>
-              <Form.Group controlId="formDate" style={{ marginBottom: "20px", zIndex: "1001" }}>
-                <Form.Label>Preferred Date</Form.Label>
+              <Form.Group controlId="formDate" style={{ marginBottom: "15px" }}>
+                <Form.Label style={{ color: "#4b5563", fontWeight: "500" }}>Preferred Date</Form.Label>
                 <Form.Control
                   type="date"
                   value={scheduleForm.date}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, date: e.target.value })}
+                  style={inputStyle("date")}
+                  onFocus={() => setIsInputFocused((prev) => ({ ...prev, date: true }))}
+                  onBlur={() => setIsInputFocused((prev) => ({ ...prev, date: false }))}
                 />
               </Form.Group>
-
-              <Form.Group controlId="formTime" style={{ marginBottom: "20px", zIndex: "1001" }}>
-                <Form.Label>Preferred Time</Form.Label>
+              <Form.Group controlId="formTime" style={{ marginBottom: "15px" }}>
+                <Form.Label style={{ color: "#4b5563", fontWeight: "500" }}>Preferred Time</Form.Label>
                 <Form.Control
                   type="time"
                   value={scheduleForm.time}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, time: e.target.value })}
+                  style={inputStyle("time")}
+                  onFocus={() => setIsInputFocused((prev) => ({ ...prev, time: true }))}
+                  onBlur={() => setIsInputFocused((prev) => ({ ...prev, time: false }))}
                 />
               </Form.Group>
-
-              <Button
-                variant="success"
-                type="submit"
-                onClick={async (e) => {
-                  e.preventDefault();
-                  if (scheduleForm.date === "" || scheduleForm.time === "") {
-                    toast.error("Please fill all the fields");
-                    return;
-                  }
-
-                  scheduleForm.username = selectedChat.username;
-                  try {
-                    const { data } = await axios.post("/user/sendScheduleMeet", scheduleForm);
-                    toast.success("Request mail has been sent successfully!");
-                    setScheduleForm({
-                      date: "",
-                      time: "",
-                    });
-                  } catch (error) {
-                    console.log(error);
-                    if (error?.response?.data?.message) {
-                      toast.error(error.response.data.message);
-                      if (error.response.data.message === "Please Login") {
+              <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
+                <Button
+                  style={buttonStyle}
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    if (scheduleForm.date === "" || scheduleForm.time === "") {
+                      toast.error("Please fill all the fields");
+                      return;
+                    }
+                    scheduleForm.username = selectedChat.username;
+                    try {
+                      if (scheduleSubmitting) return;
+                      setScheduleSubmitting(true);
+                      const { data } = await axios.post("/user/sendScheduleMeet", scheduleForm);
+                      if (data?.data) setChatMessages((prev) => [...prev, data.data]);
+                      toast.success("Request sent and posted to chat");
+                      setScheduleForm({ date: "", time: "" });
+                    } catch (error) {
+                      toast.error(error?.response?.data?.message || "Something went wrong");
+                      if (error?.response?.data?.message === "Please Login") {
                         localStorage.removeItem("userInfo");
                         setUser(null);
                         await axios.get("/auth/logout");
                         navigate("/login");
                       }
-                    } else {
-                      toast.error("Something went wrong");
+                    } finally {
+                      setScheduleSubmitting(false);
+                      setScheduleModalShow(false);
                     }
-                  }
-                  setScheduleModalShow(false);
-                }}
-              >
-                Submit
-              </Button>
-              <Button variant="danger" onClick={() => setScheduleModalShow(false)} style={{ marginLeft: "10px" }}>
-                Cancel
-              </Button>
+                  }}
+                  disabled={scheduleSubmitting}
+                  onMouseEnter={handleButtonHover}
+                  onMouseLeave={handleButtonLeave}
+                  onMouseDown={handleButtonMouseDown}
+                  onMouseUp={handleButtonMouseUp}
+                >
+                  {scheduleSubmitting ? <Spinner animation="border" size="sm" /> : "Submit"}
+                </Button>
+                <Button
+                  style={{ ...buttonStyle, backgroundColor: "#ef4444" }}
+                  onClick={() => setScheduleModalShow(false)}
+                  onMouseEnter={handleButtonHover}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = "#ef4444";
+                    e.target.style.transform = "translateY(0)";
+                    e.target.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1)";
+                  }}
+                  onMouseDown={handleButtonMouseDown}
+                  onMouseUp={handleButtonMouseUp}
+                >
+                  Cancel
+                </Button>
+              </div>
             </Form>
+          </div>
+        </div>
+      )}
+
+      {/* Request Modal */}
+      {requestModalShow && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          zIndex: 1000,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}>
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "8px",
+              boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+              padding: "20px",
+              maxWidth: "400px",
+              width: "100%",
+            }}
+          >
+            <h3 style={{
+              fontSize: "1.5rem",
+              fontWeight: "600",
+              color: "#1f2937",
+              marginBottom: "20px",
+              textAlign: "center",
+            }}>
+              Confirm Your Choice
+            </h3>
+            {selectedRequest && (
+              <RequestCard
+                name={selectedRequest?.name}
+                skills={selectedRequest?.skillsProficientAt}
+                rating="4"
+                picture={selectedRequest?.picture}
+                username={selectedRequest?.username}
+                onClose={() => setRequestModalShow(false)}
+              />
+            )}
+            <div style={{ display: "flex", justifyContent: "center", gap: "10px", marginTop: "15px" }}>
+              <Button
+                style={buttonStyle}
+                onClick={handleRequestAccept}
+                disabled={acceptRequestLoading}
+                onMouseEnter={handleButtonHover}
+                onMouseLeave={handleButtonLeave}
+                onMouseDown={handleButtonMouseDown}
+                onMouseUp={handleButtonMouseUp}
+              >
+                {acceptRequestLoading ? <Spinner animation="border" size="sm" /> : "Accept"}
+              </Button>
+              <Button
+                style={{ ...buttonStyle, backgroundColor: "#ef4444" }}
+                onClick={handleRequestReject}
+                disabled={acceptRequestLoading}
+                onMouseEnter={handleButtonHover}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = "#ef4444";
+                  e.target.style.transform = "translateY(0)";
+                  e.target.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1)";
+                }}
+                onMouseDown={handleButtonMouseDown}
+                onMouseUp={handleButtonMouseUp}
+              >
+                {acceptRequestLoading ? <Spinner animation="border" size="sm" /> : "Reject"}
+              </Button>
+            </div>
           </div>
         </div>
       )}

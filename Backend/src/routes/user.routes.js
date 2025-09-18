@@ -14,10 +14,26 @@ import {
   uploadPic,
   discoverUsers,
   sendScheduleMeet,
+  // Add these new imports for search functionality
+  searchUsers,
+  getTrendingSkills,
+  getSkillSuggestions,
 } from "../controllers/user.controllers.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
 const router = Router();
+
+// ========== SEARCH ROUTES (NEW) ==========
+// Search for users based on various criteria
+router.route("/search").get(searchUsers);
+
+// Get trending skills based on user data
+router.route("/trending-skills").get(getTrendingSkills);
+
+// Get skill suggestions based on partial input
+router.route("/skill-suggestions").get(getSkillSuggestions);
+
+// ========== EXISTING ROUTES ==========
 
 // save and register unregistered user details
 router.route("/unregistered/getDetails").get(verifyJWT_email, UnRegisteredUserDetails);

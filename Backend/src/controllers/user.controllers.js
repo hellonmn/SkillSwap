@@ -7,6 +7,8 @@ import { UnRegisteredUser } from "../models/unRegisteredUser.model.js";
 import { generateJWTToken_username } from "../utils/generateJWTToken.js";
 import { uploadOnCloudinary } from "../config/connectCloudinary.js";
 import { sendMail } from "../utils/SendMail.js";
+import { Chat } from "../models/chat.model.js";
+import { Message } from "../models/message.model.js";
 
 export const userDetailsWithoutID = asyncHandler(async (req, res) => {
   console.log("\n******** Inside userDetailsWithoutID Controller function ********");
@@ -612,5 +614,468 @@ export const sendScheduleMeet = asyncHandler(async (req, res) => {
 
   await sendMail(to, subject, message);
 
-  return res.status(200).json(new ApiResponse(200, null, "Email sent successfully"));
+  // Create or find chat between requester and recipient, then send a callRequest message
+  const requesterId = req.user._id;
+  const recipientId = user._id;
+
+  let chat = await Chat.findOne({ users: { $all: [requesterId, recipientId] } });
+  if (!chat) {
+    chat = await Chat.create({ users: [requesterId, recipientId] });
+  }
+
+  const content = `${req.user.name} requested a video call on ${date} at ${time}`;
+
+  let callRequestMessage = await Message.create({
+    chatId: chat._id,
+    sender: requesterId,
+    content: content,
+    type: "callRequest",
+  });
+
+  callRequestMessage = await callRequestMessage.populate("sender", "username name email picture");
+  callRequestMessage = await callRequestMessage.populate("chatId");
+  callRequestMessage = await User.populate(callRequestMessage, {
+    path: "chatId.users",
+    select: "username name email picture",
+  });
+
+  await Chat.findByIdAndUpdate(
+    { _id: chat._id },
+    {
+      latestMessage: callRequestMessage,
+    }
+  );
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, callRequestMessage, "Email sent and call request posted to chat"));
+});
+
+
+/**
+ * Search for users based on various criteria
+ * @route GET /api/users/search
+ * @param {string} query - Search query (can be skill, name, username, or bio content)
+ * @param {string} category - Optional category filter (skills, name, bio, all)
+ * @param {number} limit - Number of results to return (default: 10, max: 50)
+ * @param {number} page - Page number for pagination (default: 1)
+ * @param {string} sortBy - Sort by: relevance, rating, recent, name (default: relevance)
+ */
+export const searchUsers = asyncHandler(async (req, res) => {
+  console.log("******** Inside searchUsers Function *******");
+  
+  const { 
+    query, 
+    category = "all", 
+    limit = 10, 
+    page = 1, 
+    sortBy = "relevance" 
+  } = req.query;
+
+  // Validate input
+  if (!query || query.trim().length < 2) {
+    throw new ApiError(400, "Search query must be at least 2 characters long");
+  }
+
+  const searchQuery = query.trim();
+  const limitNum = Math.min(parseInt(limit) || 10, 50); // Max 50 results
+  const pageNum = Math.max(parseInt(page) || 1, 1);
+  const skip = (pageNum - 1) * limitNum;
+
+  // Build MongoDB aggregation pipeline
+  let pipeline = [];
+
+  // Exclude current user if authenticated
+  const excludeFilter = req.user ? { username: { $ne: req.user.username } } : {};
+  pipeline.push({ $match: excludeFilter });
+
+  // Create search conditions based on category
+  let searchConditions = [];
+
+  if (category === "all" || category === "skills") {
+    // Search in skills (case-insensitive, partial match)
+    searchConditions.push(
+      {
+        skillsProficientAt: {
+          $elemMatch: { $regex: searchQuery, $options: "i" }
+        }
+      },
+      {
+        skillsToLearn: {
+          $elemMatch: { $regex: searchQuery, $options: "i" }
+        }
+      }
+    );
+  }
+
+  if (category === "all" || category === "name") {
+    // Search in name and username
+    searchConditions.push(
+      { name: { $regex: searchQuery, $options: "i" } },
+      { username: { $regex: searchQuery, $options: "i" } }
+    );
+  }
+
+  if (category === "all" || category === "bio") {
+    // Search in bio
+    searchConditions.push(
+      { bio: { $regex: searchQuery, $options: "i" } }
+    );
+  }
+
+  if (category === "all" || category === "projects") {
+    // Search in project titles and descriptions
+    searchConditions.push(
+      {
+        "projects.title": { $regex: searchQuery, $options: "i" }
+      },
+      {
+        "projects.description": { $regex: searchQuery, $options: "i" }
+      },
+      {
+        "projects.techStack": {
+          $elemMatch: { $regex: searchQuery, $options: "i" }
+        }
+      }
+    );
+  }
+
+  if (category === "all" || category === "education") {
+    // Search in education
+    searchConditions.push(
+      {
+        "education.institution": { $regex: searchQuery, $options: "i" }
+      },
+      {
+        "education.degree": { $regex: searchQuery, $options: "i" }
+      }
+    );
+  }
+
+  // Apply search conditions
+  if (searchConditions.length > 0) {
+    pipeline.push({
+      $match: {
+        $or: searchConditions
+      }
+    });
+  }
+
+  // Add relevance score calculation
+  pipeline.push({
+    $addFields: {
+      relevanceScore: {
+        $sum: [
+          // Exact skill matches get highest score
+          {
+            $size: {
+              $filter: {
+                input: "$skillsProficientAt",
+                cond: { $eq: [{ $toLower: "$$this" }, searchQuery.toLowerCase()] }
+              }
+            }
+          },
+          // Partial skill matches
+          {
+            $multiply: [
+              0.8,
+              {
+                $size: {
+                  $filter: {
+                    input: "$skillsProficientAt",
+                    cond: {
+                      $regexMatch: {
+                        input: { $toLower: "$$this" },
+                        regex: searchQuery.toLowerCase()
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          // Skills to learn matches
+          {
+            $multiply: [
+              0.6,
+              {
+                $size: {
+                  $filter: {
+                    input: "$skillsToLearn",
+                    cond: {
+                      $regexMatch: {
+                        input: { $toLower: "$$this" },
+                        regex: searchQuery.toLowerCase()
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          // Name matches
+          {
+            $cond: [
+              { $regexMatch: { input: { $toLower: "$name" }, regex: searchQuery.toLowerCase() } },
+              0.7,
+              0
+            ]
+          },
+          // Username matches
+          {
+            $cond: [
+              { $regexMatch: { input: { $toLower: "$username" }, regex: searchQuery.toLowerCase() } },
+              0.5,
+              0
+            ]
+          },
+          // Bio matches
+          {
+            $cond: [
+              { $regexMatch: { input: { $toLower: "$bio" }, regex: searchQuery.toLowerCase() } },
+              0.3,
+              0
+            ]
+          },
+          // Rating boost for high-rated users
+          { $multiply: ["$rating", 0.1] }
+        ]
+      }
+    }
+  });
+
+  // Apply sorting
+  let sortStage = {};
+  switch (sortBy) {
+    case "rating":
+      sortStage = { rating: -1, relevanceScore: -1 };
+      break;
+    case "recent":
+      sortStage = { createdAt: -1, relevanceScore: -1 };
+      break;
+    case "name":
+      sortStage = { name: 1 };
+      break;
+    case "relevance":
+    default:
+      sortStage = { relevanceScore: -1, rating: -1 };
+      break;
+  }
+
+  pipeline.push({ $sort: sortStage });
+
+  // Add pagination
+  pipeline.push({ $skip: skip });
+  pipeline.push({ $limit: limitNum });
+
+  // Project only necessary fields
+  pipeline.push({
+    $project: {
+      username: 1,
+      name: 1,
+      picture: 1,
+      bio: 1,
+      skillsProficientAt: 1,
+      skillsToLearn: 1,
+      rating: 1,
+      linkedinLink: 1,
+      githubLink: 1,
+      portfolioLink: 1,
+      relevanceScore: 1,
+      // Include limited education and projects info
+      education: {
+        $slice: ["$education", 2] // Show only first 2 education entries
+      },
+      projects: {
+        $slice: [
+          {
+            $map: {
+              input: "$projects",
+              as: "project",
+              in: {
+                title: "$$project.title",
+                description: "$$project.description",
+                techStack: "$$project.techStack"
+              }
+            }
+          },
+          3 // Show only first 3 projects
+        ]
+      }
+    }
+  });
+
+  // Execute the aggregation
+  const users = await User.aggregate(pipeline);
+
+  // Get total count for pagination (run separate query for performance)
+  const countPipeline = [
+    { $match: excludeFilter },
+    {
+      $match: searchConditions.length > 0 ? { $or: searchConditions } : {}
+    },
+    { $count: "total" }
+  ];
+
+  const countResult = await User.aggregate(countPipeline);
+  const totalResults = countResult.length > 0 ? countResult[0].total : 0;
+
+  // Calculate pagination info
+  const totalPages = Math.ceil(totalResults / limitNum);
+  const hasNextPage = pageNum < totalPages;
+  const hasPrevPage = pageNum > 1;
+
+  // Prepare response data
+  const responseData = {
+    users,
+    pagination: {
+      currentPage: pageNum,
+      totalPages,
+      totalResults,
+      hasNextPage,
+      hasPrevPage,
+      resultsPerPage: limitNum
+    },
+    searchInfo: {
+      query: searchQuery,
+      category,
+      sortBy,
+      resultsCount: users.length
+    }
+  };
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      responseData,
+      `Found ${users.length} users matching "${searchQuery}"`
+    )
+  );
+});
+
+/**
+ * Get trending skills based on user data
+ * @route GET /api/users/trending-skills
+ * @param {number} limit - Number of skills to return (default: 10, max: 20)
+ */
+export const getTrendingSkills = asyncHandler(async (req, res) => {
+  console.log("******** Inside getTrendingSkills Function *******");
+  
+  const { limit = 10 } = req.query;
+  const limitNum = Math.min(parseInt(limit) || 10, 20);
+
+  // Aggregate trending skills from both skillsProficientAt and skillsToLearn
+  const pipeline = [
+    {
+      $project: {
+        allSkills: {
+          $concatArrays: ["$skillsProficientAt", "$skillsToLearn"]
+        }
+      }
+    },
+    { $unwind: "$allSkills" },
+    {
+      $match: {
+        allSkills: { $ne: "" } // Exclude empty strings
+      }
+    },
+    {
+      $group: {
+        _id: { $toLower: "$allSkills" }, // Case insensitive grouping
+        count: { $sum: 1 },
+        originalName: { $first: "$allSkills" }
+      }
+    },
+    {
+      $sort: { count: -1 }
+    },
+    {
+      $limit: limitNum
+    },
+    {
+      $project: {
+        _id: 0,
+        skill: "$originalName",
+        count: 1
+      }
+    }
+  ];
+
+  const trendingSkills = await User.aggregate(pipeline);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      { skills: trendingSkills },
+      "Trending skills fetched successfully"
+    )
+  );
+});
+
+/**
+ * Get skill suggestions based on partial input
+ * @route GET /api/users/skill-suggestions
+ * @param {string} input - Partial skill name
+ * @param {number} limit - Number of suggestions (default: 5, max: 10)
+ */
+export const getSkillSuggestions = asyncHandler(async (req, res) => {
+  console.log("******** Inside getSkillSuggestions Function *******");
+  
+  const { input, limit = 5 } = req.query;
+
+  if (!input || input.trim().length < 1) {
+    throw new ApiError(400, "Input parameter is required");
+  }
+
+  const searchInput = input.trim();
+  const limitNum = Math.min(parseInt(limit) || 5, 10);
+
+  const pipeline = [
+    {
+      $project: {
+        allSkills: {
+          $concatArrays: ["$skillsProficientAt", "$skillsToLearn"]
+        }
+      }
+    },
+    { $unwind: "$allSkills" },
+    {
+      $match: {
+        allSkills: {
+          $regex: searchInput,
+          $options: "i"
+        }
+      }
+    },
+    {
+      $group: {
+        _id: { $toLower: "$allSkills" },
+        skill: { $first: "$allSkills" },
+        count: { $sum: 1 }
+      }
+    },
+    {
+      $sort: { count: -1 }
+    },
+    {
+      $limit: limitNum
+    },
+    {
+      $project: {
+        _id: 0,
+        skill: 1,
+        count: 1
+      }
+    }
+  ];
+
+  const suggestions = await User.aggregate(pipeline);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      { suggestions },
+      `Found ${suggestions.length} skill suggestions`
+    )
+  );
 });
